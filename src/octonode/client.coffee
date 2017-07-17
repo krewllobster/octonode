@@ -147,26 +147,20 @@ class Client
         body = JSON.parse(body || '{}')
       catch err
         return callback(err)
-    debugger
     return callback(new HttpError(body.message, res.statusCode, res.headers, body)) if body.message and res.statusCode in [400, 401, 403, 404, 410, 422]
     callback null, res.statusCode, body, res.headers
 
   errorHandlePromise: (cb) ->
-    debugger
     return ({statusCode, response: {body, headers}}) ->
-      debugger
       fiveHundredError = new HttpError('Error ' + statusCode, statusCode, headers, body)
       fourHundredError = new HttpError(body.message, statusCode, headers, body)
-      debugger
       return cb(fiveHundredError) if Math.floor(statusCode/100) is 5
       return cb(fourHundredError) if Math.floor(statusCode/100) is 4
 
       return cb(new Error('Unhandled http error'))
 
   successHandle: (cb) ->
-    debugger
     return ({statusCode, body, headers}) ->
-      debugger
       return cb(null, statusCode, body, headers)
   # Github api GET request
 
