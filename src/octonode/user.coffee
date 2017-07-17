@@ -17,7 +17,15 @@ class User
 
   # Get a user (promise)
   info: (cb) ->
-    return @client.get("/users/#{@login}", cb)
+
+    cb ?= (args...) -> args
+
+    return @client.get("/users/#{@login}")
+      .then(([err, s, b, h]) ->
+        return cb(err) if err
+        return cb(new Error('User info error')) if s isnt 200
+        cb null, b, h
+      )
   # original
   # '/users/pkumar' GET
   # info: (cb) ->

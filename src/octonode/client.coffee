@@ -39,6 +39,8 @@ class Client
     @requestDefaults =
       headers:
         'User-Agent': 'octonode/0.3 (https://github.com/pksunkara/octonode) terminal/0.0'
+      json: true
+      resolveWithFullResponse: true
 
     if @token and typeof @token == 'string'
       @requestDefaults.headers.Authorization = "token " + @token
@@ -149,36 +151,37 @@ class Client
     return callback(new HttpError(body.message, res.statusCode, res.headers, body)) if body.message and res.statusCode in [400, 401, 403, 404, 410, 422]
     callback null, res.statusCode, body, res.headers
 
-  errorHandlePromise: (response, cb) ->
+  errorHandlePromise: (cb) ->
     debugger
-    {statusCode, body, headers} = response
+    return ({statusCode, response: {body, headers}}) ->
+      debugger
+      fiveHundredError = new HttpError('Error ' + statusCode, statusCode, headers, body)
+      fourHundredError = new HttpError(body.message, statusCode, headers, body)
+      debugger
+      return cb(fiveHundredError) if Math.floor(statusCode/100) is 5
+      return cb(fourHundredError) if Math.floor(statusCode/100) is 4
 
-    fiveError = new HttpError('Error ' + statusCode, statusCode, headers)
-    fourError = new HttpError(body.message, statusCode, headers, body)
+      return cb(new Error('Unhandled http error'))
 
-    return cb(fiveError) if Math.floor(statusCode/100) is 5
-    return cb(fourError) if body.message and Math.floor(statusCode/100) is 4
-
-    return cb(null, statusCode, body, headers)
-
+  successHandle: (cb) ->
+    debugger
+    return ({statusCode, body, headers}) ->
+      debugger
+      return cb(null, statusCode, body, headers)
   # Github api GET request
 
   get: (path, params..., cb) =>
 
-    cb = if cb then cb else () -> arguments
+    cb ?= (args...) -> args
 
-    options = @requestOptions(
+    options = @requestOptions
       uri: @buildUrl path, params...
       method: 'GET'
       followRedirect: true
-      json: true
-      simple: false
-      resolveWithFullResponse: true
-    )
 
     return @rp options
-      .then((response) => @errorHandlePromise(response, cb))
-      .catch((err) -> cb(err))
+      .then @successHandle cb
+      .catch @errorHandlePromise cb
 
   # original get with callback
   # get: (path, params..., callback) ->
@@ -197,9 +200,6 @@ class Client
       uri: @buildUrl path, params...
       method: 'GET'
       followRedirect: false
-      json: true
-      simple: false
-      resolveWithFullResponse: true
     )
 
     return @rp options
@@ -228,9 +228,6 @@ class Client
       uri: @buildUrl path, params...
       method: 'GET'
       followRedirect: false
-      json: true
-      simple: false
-      resolveWithFullResponse: true
     }, options)
 
     return @rp options
@@ -255,8 +252,7 @@ class Client
     reqDefaultOption =
       uri: @buildUrl path, options.query
       method: 'POST'
-      headers:
-        'Content-Type': 'application/json'
+      headers: 'Content-Type': 'application/json'
 
     if content
       reqDefaultOption.body = JSON.stringify content
