@@ -15,17 +15,19 @@ class User
     Object.keys(data).forEach (e) =>
       @[e] = data[e]
 
-  # Get a user (promise)
-  info: (cb) ->
+  handleResponse: (message, cb) ->
 
     cb ?= (args...) -> args
 
+    ([err, s, b, h]) ->
+      return cb(err) if err
+      return cb(new Error(message)) if s isnt 200
+      cb null, b, h
+
+  # Get a user (promise)
+  info: (cb) ->
     return @client.get("/users/#{@login}")
-      .then(([err, s, b, h]) ->
-        return cb(err) if err
-        return cb(new Error('User info error')) if s isnt 200
-        cb null, b, h
-      )
+      .then @handleResponse 'User info error', cb
   # original
   # '/users/pkumar' GET
   # info: (cb) ->
@@ -39,7 +41,8 @@ class User
   # - per_page, optional             - params[1]
 
   followers: (params..., cb) ->
-    return @client.get "/users/#{@login}/followers", params..., cb
+    return @client.get "/users/#{@login}/followers", params...
+      .then @handleResponse 'User followers error', cb
 
   # original
   # followers: (params..., cb) ->
