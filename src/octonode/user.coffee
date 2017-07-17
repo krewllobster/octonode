@@ -26,8 +26,20 @@ class User
 
   # Get a user (promise)
   info: (cb) ->
-    return @client.get("/users/#{@login}")
-      .then @handleResponse 'User info error', cb
+    return new Promise((resolve, reject)=>
+      @client.get "/users/#{@login}", (err, s, b, h) ->
+        customError = new Error('User info error')
+        if cb
+          return cb(err) if err
+          return cb(customError) if s isnt 200
+          return cb(null, b, h)
+        return reject([err]) if err
+        return reject([customError]) if s isnt 200
+        try
+          resolve([null, b, h])
+        catch error
+          reject([error])
+    )
   # original
   # '/users/pkumar' GET
   # info: (cb) ->
