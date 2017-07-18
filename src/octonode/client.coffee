@@ -187,19 +187,19 @@ class Client
   #     return callback(err) if err
   #     @errorHandle res, body, callback
 
-  getNoFollow: (path, params..., cb) =>
-
-    cb = if cb then cb else () -> arguments
-
-    options = @requestOptions(
-      uri: @buildUrl path, params...
-      method: 'GET'
-      followRedirect: false
-    )
-
-    return @rp options
-      .then((response) => @errorHandlePromise(response, cb))
-      .catch((err) -> cb(err))
+  # getNoFollow: (path, params..., cb) =>
+  #
+  #   cb = if cb then cb else () -> arguments
+  #
+  #   options = @requestOptions(
+  #     uri: @buildUrl path, params...
+  #     method: 'GET'
+  #     followRedirect: false
+  #   )
+  # 
+  #   return @rp options
+  #     .then((response) => @errorHandlePromise(response, cb))
+  #     .catch((err) -> cb(err))
   # Github api GET request no redirect follow
   # getNoFollow: (path, params..., callback) ->
   #
@@ -211,23 +211,23 @@ class Client
   #     return callback(err) if err
   #     @errorHandle res, body, callback
 
-  getOptions: (path, options, params..., cb) ->
-
-    if typeof options != 'object'
-      console.log('options arg must be an object, if no options use .get')
-      return
-
-    cb = if cb then cb else () -> arguments
-
-    options = @requestOptions({
-      uri: @buildUrl path, params...
-      method: 'GET'
-      followRedirect: false
-    }, options)
-
-    return @rp options
-      .then((response) => @errorHandlePromise(response, cb))
-      .catch((err) -> cb(err))
+  # getOptions: (path, options, params..., cb) ->
+  #
+  #   if typeof options != 'object'
+  #     console.log('options arg must be an object, if no options use .get')
+  #     return
+  #
+  #   cb = if cb then cb else () -> arguments
+  #
+  #   options = @requestOptions({
+  #     uri: @buildUrl path, params...
+  #     method: 'GET'
+  #     followRedirect: false
+  #   }, options)
+  #
+  #   return @rp options
+  #     .then((response) => @errorHandlePromise(response, cb))
+  #     .catch((err) -> cb(err))
 
   # Github api GET request with specified options
   # getOptions: (path, options, params..., callback) ->
