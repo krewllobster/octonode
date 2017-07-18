@@ -139,21 +139,24 @@ class Client
 
     return _url
 
-  errorHandle: ({statusCode, headers}, body, resolve, reject, cb) ->
+
+
+  errorHandlePromise: ({statusCode, headers}, body, resolve, reject) ->
     fiveHundredError = new HttpError('Error ' + statusCode, statusCode, headers)
     fourHundredError = new HttpError(body.message, statusCode, headers, body)
-
-    if cb
-      return cb(fiveHundredError) if Math.floor(statusCode/100) is 5
-      return cb(fourHundredError) if Math.floor(statusCode/100) is 4
-      return cb(null, statusCode, body, headers)
-
-    return reject(fiveHundredError) if Math.floor(statusCode/100) is 5
-    return reject(fourHundredError) if Math.floor(statusCode/100) is 4
+    return reject([fiveHundredError]) if Math.floor(statusCode/100) is 5
+    return reject([fourHundredError]) if Math.floor(statusCode/100) is 4
     try
       return resolve([null, statusCode, body, headers])
     catch error
-      return reject(error)
+      return reject([error])
+
+  errorHandleCb: ({statusCode, headers}, body, cb) ->
+    fiveHundredError = new HttpError('Error ' + statusCode, statusCode, headers)
+    fourHundredError = new HttpError(body.message, statusCode, headers, body)
+    return cb(fiveHundredError) if Math.floor(statusCode/100) is 5
+    return cb(fourHundredError) if Math.floor(statusCode/100) is 4
+    return cb(null, statusCode, body, headers)
 
   # Github api GET request
 
@@ -168,7 +171,8 @@ class Client
       @request options, (err, res, body) =>
         if cb then return cb(err) if err
         return reject(err) if err
-        @errorHandle res, body, resolve, reject, cb
+        @errorHandleCb res, body, cb if cb
+        @errorHandlePromise res, body, resolve, reject if !cb
     )
 
     # return @rp(options).promise()
