@@ -6,7 +6,6 @@
 
 # Requiring modules
 request = require 'request'
-rp = require 'request-promise-native'
 url = require 'url'
 global.Promise = require 'bluebird'
 
@@ -35,7 +34,6 @@ class Client
 
   constructor: (@token, @options) ->
     @request = @options and @options.request or request
-    @rp = @options and @options.rp or rp
     @requestDefaults =
       headers:
         'User-Agent': 'octonode/0.3 (https://github.com/pksunkara/octonode) terminal/0.0'
