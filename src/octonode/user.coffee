@@ -18,6 +18,7 @@ class User
 
   # Get a user (promise)
   info: (cb) =>
+    cb ?= (args...) -> args
     return new Promise((resolve, reject)=>
       @client.get "/users/#{@login}", (err, s, b, h) ->
         customError = new Error('User info error')

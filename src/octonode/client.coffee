@@ -6,6 +6,7 @@
 
 # Requiring modules
 request = require 'request'
+rp = require 'request-promise-native'
 url = require 'url'
 global.Promise = require 'bluebird'
 
@@ -137,106 +138,58 @@ class Client
 
     return _url
 
-
-
-  errorHandlePromise: ({statusCode, headers}, body, resolve, reject) ->
-    fiveHundredError = new HttpError('Error ' + statusCode, statusCode, headers)
-    fourHundredError = new HttpError(body.message, statusCode, headers, body)
-    return reject([fiveHundredError]) if Math.floor(statusCode/100) is 5
-    return reject([fourHundredError]) if Math.floor(statusCode/100) is 4
-    try
-      return resolve([null, statusCode, body, headers])
-    catch error
-      return reject([error])
-
-  errorHandleCb: ({statusCode, headers}, body, cb) ->
-    fiveHundredError = new HttpError('Error ' + statusCode, statusCode, headers)
-    fourHundredError = new HttpError(body.message, statusCode, headers, body)
-    return cb(fiveHundredError) if Math.floor(statusCode/100) is 5
-    return cb(fourHundredError) if Math.floor(statusCode/100) is 4
-    return cb(null, statusCode, body, headers)
+  errorHandle: ({statusCode, headers, message, error}, resolve, reject, cb) ->
+    fiveHundredError = new HttpError('Error ' + statusCode, headers, error)
+    fourHundredError = new HttpError(message, statusCode, headers, error)
+    debugger
+    if Math.floor(statusCode/100) is 5
+      reject(fiveHundredError)
+      cb(fiveHundredError)
+    if Math.floor(statusCode/100) is 4
+      reject(fourHundredError)
+      cb(fourHundredError)
 
   # Github api GET request
 
-  get: (path, params..., cb) =>
+  get: (path, options = {}, params..., cb) =>
 
-    options = @requestOptions
+    options = @requestOptions(
       uri: @buildUrl path, params...
-      method: 'GET'
-      followRedirect: true
+      method: 'GET', options, options)
+
+    cb = cb || () -> {}
+    debugger
+    return new Promise((resolve, reject) =>
+      @request options, (err, res, body) =>
+        if err
+          debugger
+          @errorHandle res, body, resolve, reject, cb
+        else
+          resolve([res.statusCode, body, res.headers])
+          cb(null, res.statusCode, body, res.headers)
+    )
+
+  getNoFollow: (path, params..., cb) =>
+
+    @get(path, {followRedirect: false}, params..., cb)
+
+  getOptions: (path, options, params..., cb) =>
+
+    if typeof options != 'object'
+      console.log('please pass options object as second arg')
+      return undefined
+
+    options = @requestOptions(
+      uri: @buildUrl path, params...
+      method: 'GET',
+      options
+    )
 
     return new Promise((resolve, reject) =>
       @request options, (err, res, body) =>
-        if cb then return cb(err) if err
-        return reject(err) if err
-        @errorHandleCb res, body, cb if cb
-        @errorHandlePromise res, body, resolve, reject if !cb
-    )
-
-    # return @rp(options).promise()
-    #   .then @successHandle(cb)
-    #   .catch((e) -> console.log(e))
-    #   .catch @errorHandlePromise(cb)
-
-  # original get with callback
-  # get: (path, params..., callback) ->
-  #   @request @requestOptions(
-  #     uri: @buildUrl path, params...
-  #     method: 'GET'
-  #   ), (err, res, body) =>
-  #     return callback(err) if err
-  #     @errorHandle res, body, callback
-
-  # getNoFollow: (path, params..., cb) =>
-  #
-  #   cb = if cb then cb else () -> arguments
-  #
-  #   options = @requestOptions(
-  #     uri: @buildUrl path, params...
-  #     method: 'GET'
-  #     followRedirect: false
-  #   )
-  # 
-  #   return @rp options
-  #     .then((response) => @errorHandlePromise(response, cb))
-  #     .catch((err) -> cb(err))
-  # Github api GET request no redirect follow
-  # getNoFollow: (path, params..., callback) ->
-  #
-  #   @request @requestOptions(
-  #     uri: @buildUrl path, params...
-  #     method: 'GET'
-  #     followRedirect: false
-  #   ), (err, res, body) =>
-  #     return callback(err) if err
-  #     @errorHandle res, body, callback
-
-  # getOptions: (path, options, params..., cb) ->
-  #
-  #   if typeof options != 'object'
-  #     console.log('options arg must be an object, if no options use .get')
-  #     return
-  #
-  #   cb = if cb then cb else () -> arguments
-  #
-  #   options = @requestOptions({
-  #     uri: @buildUrl path, params...
-  #     method: 'GET'
-  #     followRedirect: false
-  #   }, options)
-  #
-  #   return @rp options
-  #     .then((response) => @errorHandlePromise(response, cb))
-  #     .catch((err) -> cb(err))
-
-  # Github api GET request with specified options
-  # getOptions: (path, options, params..., callback) ->
-  #   @request @requestOptions({
-  #     uri: @buildUrl path, params...
-  #     method: 'GET'
-  #   }, options), (err, res, body) =>
-  #     return callback(err) if err
-  #     @errorHandle res, body, callback
+        return (if cb then cb(err) else reject(err)) if err
+        @errorHandle res, body, resolve, reject, cb
+      )
 
   # Github api POST request
   post: (path, content, options, callback) ->
