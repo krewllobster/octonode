@@ -139,18 +139,14 @@ class Client
 
     return _url
 
-  errorHandle: ({statusCode, headers, message, error}, body, cb) ->
+  errorHandle: ({statusCode, headers, message, error}, body, resolve, reject, cb) ->
     fiveHundredError = new HttpError('Error ' + statusCode, headers, error)
     fourHundredError = new HttpError(message, statusCode, headers, error)
-    debugger
     if Math.floor(statusCode/100) is 5
-      return cb(fiveHundredError) if cb
-      return Promise.reject(fiveHundredError)
+      return reject(cb(fiveHundredError))
     if Math.floor(statusCode/100) is 4
-      return cb(fourHundredError) if cb
-      return Promise.reject(fourHundredError)
-    return cb(null, res.statusCode, body, res.headers) if cb
-    return Promise.resolve([null, res.statusCode, body, res.headers])
+      return reject(cb(fourHundredError))
+    return resolve(cb(null, statusCode, body, headers))
 
   # Github api GET request
 
@@ -160,12 +156,13 @@ class Client
       uri: @buildUrl path, params...
       method: 'GET')
 
-    @request options, (err, res, body) =>
-      if err
-        return cb(err) if cb
-        return Promise.reject(err)
-      else
-        @errorHandle res, body, cb
+    cb = cb || (args...) -> args
+
+    return new Promise((resolve, reject) =>
+      @request options, (err, res, body) =>
+        return reject(cb(err)) if err
+        @errorHandle res, body, resolve, reject, cb
+    )
 
   getNoFollow: (path, params..., cb) =>
 
