@@ -35,6 +35,7 @@ class Client
 
   constructor: (@token, @options) ->
     @request = @options and @options.request or request
+    @rp = @options and @options.request or request
     @requestDefaults =
       headers:
         'User-Agent': 'octonode/0.3 (https://github.com/pksunkara/octonode) terminal/0.0'
@@ -138,36 +139,33 @@ class Client
 
     return _url
 
-  errorHandle: ({statusCode, headers, message, error}, resolve, reject, cb) ->
+  errorHandle: ({statusCode, headers, message, error}, body, cb) ->
     fiveHundredError = new HttpError('Error ' + statusCode, headers, error)
     fourHundredError = new HttpError(message, statusCode, headers, error)
     debugger
     if Math.floor(statusCode/100) is 5
-      reject(fiveHundredError)
-      cb(fiveHundredError)
+      return cb(fiveHundredError) if cb
+      return Promise.reject(fiveHundredError)
     if Math.floor(statusCode/100) is 4
-      reject(fourHundredError)
-      cb(fourHundredError)
+      return cb(fourHundredError) if cb
+      return Promise.reject(fourHundredError)
+    return cb(null, res.statusCode, body, res.headers) if cb
+    return Promise.resolve([null, res.statusCode, body, res.headers])
 
   # Github api GET request
 
-  get: (path, options = {}, params..., cb) =>
+  get: (path, params..., cb) =>
 
     options = @requestOptions(
       uri: @buildUrl path, params...
-      method: 'GET', options, options)
+      method: 'GET')
 
-    cb = cb || () -> {}
-    debugger
-    return new Promise((resolve, reject) =>
-      @request options, (err, res, body) =>
-        if err
-          debugger
-          @errorHandle res, body, resolve, reject, cb
-        else
-          resolve([res.statusCode, body, res.headers])
-          cb(null, res.statusCode, body, res.headers)
-    )
+    @request options, (err, res, body) =>
+      if err
+        return cb(err) if cb
+        return Promise.reject(err)
+      else
+        @errorHandle res, body, cb
 
   getNoFollow: (path, params..., cb) =>
 
