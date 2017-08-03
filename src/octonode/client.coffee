@@ -7,6 +7,7 @@
 # Requiring modules
 request = require 'request'
 url = require 'url'
+Promise = require 'bluebird'
 
 Me           = require './me'
 User         = require './user'
@@ -33,62 +34,65 @@ class Client
 
   constructor: (@token, @options) ->
     @request = @options and @options.request or request
+    @rp = @options and @options.request or request
     @requestDefaults =
       headers:
         'User-Agent': 'octonode/0.3 (https://github.com/pksunkara/octonode) terminal/0.0'
+      json: true
+      resolveWithFullResponse: true
 
     if @token and typeof @token == 'string'
       @requestDefaults.headers.Authorization = "token " + @token
 
   # Get authenticated user instance for client
   me: ->
-    new Me @
+    Promise.promisifyAll(new Me(@), {multiArgs: true})
 
   # Get user instance for client
   user: (name) ->
-    new User name, @
+    Promise.promisifyAll(new User(name, @), {multiArgs: true})
 
   # Get repository instance for client
   repo: (name) ->
-    new Repo name, @
+    Promise.promisifyAll(new Repo(name, @), {multiArgs: true})
 
   # Get organization instance for client
   org: (name) ->
-    new Org name, @
+    Promise.promisifyAll(new Org(name, @), {multiArgs: true})
 
   # Get gist instance for client
   gist: ->
-    new Gist @
+    Promise.promisifyAll(new Gist(@), {multiArgs: true})
 
   # Get team instance for client
   team: (id) ->
-    new Team id, @
+    Promise.promisifyAll(new Team(id, @), {multiArgs: true})
 
   # Get pull request instance for client
   pr: (repo, number) ->
-    new Pr repo, number, @
+    Promise.promisifyAll(new Pr(repo, number, @), {multiArgs: true})
 
   release: (repo, number) ->
-    new Release repo, number, @
+    Promise.promisifyAll(new Release(repo, number, @), {multiArgs: true})
 
   # Get search instance for client
   search: ->
-    new Search @
+    Promise.promisifyAll(new Search(@), {multiArgs: true})
 
   issue: (repo, number) ->
-    new Issue repo, number, @
+    Promise.promisifyAll(new Issue(repo, number, @), {multiArgs: true})
 
   project: (repo, number) ->
-    new Project repo, number, @
+    Promise.promisifyAll(new Project(repo, number, @), {multiArgs: true})
 
   milestone: (repo, number) ->
-    new Milestone repo, number, @
+    Promise.promisifyAll(new Milestone(repo, number, @), {multiArgs: true})
 
   label: (repo, name) ->
-    new Label repo, name, @
+    Promise.promisifyAll(new Label(repo, name, @), {multiArgs: true})
 
   notification: (id) ->
-    new Notification id, @
+    Promise.promisifyAll(new Notification(id, @), {multiArgs: true})
 
   requestOptions: (params1, params2) =>
     return extend @requestDefaults, params1, params2
@@ -106,8 +110,8 @@ class Client
           query.page = pageOrQuery
       query.per_page = per_page if per_page?
     if @token and typeof @token == 'object' and @token.id
-        query.client_id = @token.id
-        query.client_secret = @token.secret
+      query.client_id = @token.id
+      query.client_secret = @token.secret
 
     # https://github.com/pksunkara/octonode/issues/87
     if query.q
@@ -134,45 +138,52 @@ class Client
 
     return _url
 
-  errorHandle: (res, body, callback) ->
-    return callback(new HttpError('Error ' + res.statusCode, res.statusCode, res.headers)) if Math.floor(res.statusCode/100) is 5
-
-    if typeof body == 'string'
-      try
-        body = JSON.parse(body || '{}')
-      catch err
-        return callback(err)
-
-    return callback(new HttpError(body.message, res.statusCode, res.headers, body)) if body.message and res.statusCode in [400, 401, 403, 404, 410, 422]
-    callback null, res.statusCode, body, res.headers
+  errorHandle: ({statusCode, headers, message, error}, body, resolve, reject, cb) ->
+    fiveHundredError = new HttpError('Error ' + statusCode, headers, error)
+    fourHundredError = new HttpError(message, statusCode, headers, error)
+    if Math.floor(statusCode/100) is 5
+      return reject(cb(fiveHundredError))
+    if Math.floor(statusCode/100) is 4
+      return reject(cb(fourHundredError))
+    return resolve(cb(null, statusCode, body, headers))
 
   # Github api GET request
-  get: (path, params..., callback) ->
-    @request @requestOptions(
-      uri: @buildUrl path, params...
-      method: 'GET'
-    ), (err, res, body) =>
-      return callback(err) if err
-      @errorHandle res, body, callback
 
-  # Github api GET request
-  getNoFollow: (path, params..., callback) ->
-    @request @requestOptions(
-      uri: @buildUrl path, params...
-      method: 'GET'
-      followRedirect: false
-    ), (err, res, body) =>
-      return callback(err) if err
-      @errorHandle res, body, callback
+  get: (path, params..., cb) =>
 
-  # Github api GET request
-  getOptions: (path, options, params..., callback) ->
-    @request @requestOptions({
+    options = @requestOptions(
       uri: @buildUrl path, params...
-      method: 'GET'
-    }, options), (err, res, body) =>
-      return callback(err) if err
-      @errorHandle res, body, callback
+      method: 'GET')
+
+    cb = cb || (args...) -> args
+
+    return new Promise((resolve, reject) =>
+      @request options, (err, res, body) =>
+        return reject(cb(err)) if err
+        @errorHandle res, body, resolve, reject, cb
+    )
+
+  getNoFollow: (path, params..., cb) =>
+
+    @get(path, {followRedirect: false}, params..., cb)
+
+  getOptions: (path, options, params..., cb) =>
+
+    if typeof options != 'object'
+      console.log('please pass options object as second arg')
+      return undefined
+
+    options = @requestOptions(
+      uri: @buildUrl path, params...
+      method: 'GET',
+      options
+    )
+
+    return new Promise((resolve, reject) =>
+      @request options, (err, res, body) =>
+        return (if cb then cb(err) else reject(err)) if err
+        @errorHandle res, body, resolve, reject, cb
+      )
 
   # Github api POST request
   post: (path, content, options, callback) ->
@@ -183,8 +194,7 @@ class Client
     reqDefaultOption =
       uri: @buildUrl path, options.query
       method: 'POST'
-      headers:
-        'Content-Type': 'application/json'
+      headers: 'Content-Type': 'application/json'
 
     if content
       reqDefaultOption.body = JSON.stringify content
@@ -241,4 +251,4 @@ class Client
 
 # Export modules
 module.exports = (token, credentials...) ->
-  new Client(token, credentials...)
+  Promise.promisifyAll(new Client(token, credentials...), {multiArgs: true})

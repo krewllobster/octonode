@@ -15,21 +15,44 @@ class User
     Object.keys(data).forEach (e) =>
       @[e] = data[e]
 
-  # Get a user
+
+  # Get a user (promise)
+  info: (cb) =>
+    cb ?= (args...) -> args
+    return new Promise((resolve, reject)=>
+      @client.get "/users/#{@login}", (err, s, b, h) ->
+        customError = new Error('User info error')
+        return reject(cb(err)) if err
+        return reject(cb(customError)) if s isnt 200
+        return resolve(cb(null, b, h))
+    )
+  # original
   # '/users/pkumar' GET
-  info: (cb) ->
-    @client.get "/users/#{@login}", (err, s, b, h)  ->
-      return cb(err) if err
-      if s isnt 200 then cb(new Error('User info error')) else cb null, b, h
+  # info: (cb) ->
+  #   @client.get "/users/#{@login}", (err, s, b, h)  ->
+  #     return cb(err) if err
+  #     if s isnt 200 then cb(new Error('User info error')) else cb null, b, h
 
   # Get the followers of a user
   # '/users/pkumar/followers' GET
   # - page or query object, optional - params[0]
   # - per_page, optional             - params[1]
-  followers: (params..., cb) ->
-    @client.get "/users/#{@login}/followers", params..., (err, s, b, h)  ->
-      return cb(err) if err
-      if s isnt 200 then cb(new Error('User followers error')) else cb null, b, h
+
+  followers: (params..., cb) =>
+    cb ?= (args...) -> args
+    return new Promise((resolve, reject)=>
+      @client.get "/users/#{@login}/followers", params..., (err, s, b, h) ->
+        customError = new Error('User followers error')
+        return reject(cb(err)) if err
+        return reject(cb(customError)) if s isnt 200
+        return resolve(cb(null, b, h))
+    )
+
+  # original
+  # followers: (params..., cb) ->
+  #   @client.get "/users/#{@login}/followers", params..., (err, s, b, h)  ->
+  #     return cb(err) if err
+  #     if s isnt 200 then cb(new Error('User followers error')) else cb null, b, h
 
   # Get the followings of a user
   # '/users/pkumar/following' GET
