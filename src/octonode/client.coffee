@@ -6,9 +6,8 @@
 
 # Requiring modules
 request = require 'request'
-rp = require 'request-promise-native'
 url = require 'url'
-global.Promise = require 'bluebird'
+Promise = require 'bluebird'
 
 Me           = require './me'
 User         = require './user'
@@ -111,8 +110,8 @@ class Client
           query.page = pageOrQuery
       query.per_page = per_page if per_page?
     if @token and typeof @token == 'object' and @token.id
-        query.client_id = @token.id
-        query.client_secret = @token.secret
+      query.client_id = @token.id
+      query.client_secret = @token.secret
 
     # https://github.com/pksunkara/octonode/issues/87
     if query.q
